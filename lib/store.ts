@@ -91,6 +91,7 @@ interface AppState {
   }) => Promise<void>
 
   calculateBalances: (groupId: string) => Balance[]
+  updateGroup: (groupId: string, name: string, description?: string) => Promise<void>
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -320,5 +321,29 @@ export const useStore = create<AppState>((set, get) => ({
     })
 
     return balances
+  },
+  updateGroup: async (groupId: string, name: string, description?: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("groups")
+        .update({ name, description, updated_at: new Date().toISOString() })
+        .eq("id", groupId)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update the groups array
+      const { groups, currentGroup } = get()
+      const updatedGroups = groups.map((group) => (group.id === groupId ? data : group))
+      set({ groups: updatedGroups })
+
+      // Update current group if it's the one being edited
+      if (currentGroup?.id === groupId) {
+        set({ currentGroup: data })
+      }
+    } catch (error) {
+      console.error("Error updating group:", error)
+    }
   },
 }))

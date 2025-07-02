@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useStore } from "@/lib/store"
-import { ArrowLeft, Plus, Receipt, Users, Calculator, DollarSign } from "lucide-react"
+import { ArrowLeft, Plus, Receipt, Users, Calculator, DollarSign, Edit } from "lucide-react"
 import { AddExpenseModal } from "@/components/add-expense-modal"
 import { SettleUpModal } from "@/components/settle-up-modal"
+import { AddParticipantModal } from "@/components/add-participant-modal"
+import { EditGroupModal } from "@/components/edit-group-modal"
 
 export default function GroupDashboard({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -27,6 +29,8 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
 
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showSettleUp, setShowSettleUp] = useState(false)
+  const [showAddParticipant, setShowAddParticipant] = useState(false)
+  const [showEditGroup, setShowEditGroup] = useState(false)
 
   useEffect(() => {
     const group = groups.find((g) => g.id === params.id)
@@ -58,8 +62,13 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
             <Button variant="ghost" onClick={() => router.push("/")} className="mr-4">
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{currentGroup.name}</h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-3xl font-bold text-gray-900">{currentGroup.name}</h1>
+                <Button variant="ghost" size="sm" onClick={() => setShowEditGroup(true)}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </div>
               {currentGroup.description && <p className="text-gray-600">{currentGroup.description}</p>}
             </div>
           </div>
@@ -67,6 +76,10 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
             <Button onClick={() => setShowAddExpense(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Add Expense
+            </Button>
+            <Button variant="outline" onClick={() => setShowAddParticipant(true)}>
+              <Users className="mr-2 h-4 w-4" />
+              Add Participant
             </Button>
             <Button variant="outline" onClick={() => setShowSettleUp(true)}>
               <Calculator className="mr-2 h-4 w-4" />
@@ -113,6 +126,7 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
           <TabsList>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="balances">Balances</TabsTrigger>
+            <TabsTrigger value="participants">Participants</TabsTrigger>
             <TabsTrigger value="settlements">Settlements</TabsTrigger>
           </TabsList>
 
@@ -193,6 +207,70 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
             ))}
           </TabsContent>
 
+          {/* Participants Tab */}
+          <TabsContent value="participants" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Group Members</h3>
+              <Button onClick={() => setShowAddParticipant(true)} size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Participant
+              </Button>
+            </div>
+
+            {participants.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-4">No participants yet</p>
+                  <Button onClick={() => setShowAddParticipant(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add First Participant
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {participants.map((participant) => {
+                  const balance = balances.find((b) => b.participant_id === participant.id)
+                  return (
+                    <Card key={participant.id}>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <CardTitle className="text-lg">{participant.name}</CardTitle>
+                            {participant.email && <CardDescription>{participant.email}</CardDescription>}
+                          </div>
+                          {balance && (
+                            <Badge
+                              variant={balance.net_balance >= 0 ? "default" : "destructive"}
+                              className="text-sm font-semibold"
+                            >
+                              {balance.net_balance >= 0 ? "+" : ""}৳{balance.net_balance.toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
+                      </CardHeader>
+                      {balance && (
+                        <CardContent>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-600">Total Paid</p>
+                              <p className="font-semibold">৳{balance.total_paid.toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-600">Total Owed</p>
+                              <p className="font-semibold">৳{balance.total_owed.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
+
           {/* Settlements Tab */}
           <TabsContent value="settlements" className="space-y-4">
             {settlements.length === 0 ? (
@@ -249,6 +327,8 @@ export default function GroupDashboard({ params }: { params: { id: string } }) {
         participants={participants}
         balances={balances}
       />
+      <AddParticipantModal open={showAddParticipant} onOpenChange={setShowAddParticipant} groupId={params.id} />
+      <EditGroupModal open={showEditGroup} onOpenChange={setShowEditGroup} group={currentGroup} />
     </div>
   )
 }
