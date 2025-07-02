@@ -1,0 +1,254 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useStore } from "@/lib/store"
+import { ArrowLeft, Plus, Receipt, Users, Calculator, DollarSign } from "lucide-react"
+import { AddExpenseModal } from "@/components/add-expense-modal"
+import { SettleUpModal } from "@/components/settle-up-modal"
+
+export default function GroupDashboard({ params }: { params: { id: string } }) {
+  const router = useRouter()
+  const {
+    currentGroup,
+    participants,
+    expenses,
+    settlements,
+    fetchParticipants,
+    fetchExpenses,
+    fetchSettlements,
+    calculateBalances,
+    groups,
+  } = useStore()
+
+  const [showAddExpense, setShowAddExpense] = useState(false)
+  const [showSettleUp, setShowSettleUp] = useState(false)
+
+  useEffect(() => {
+    const group = groups.find((g) => g.id === params.id)
+    if (group) {
+      useStore.getState().setCurrentGroup(group)
+      fetchParticipants(params.id)
+      fetchExpenses(params.id)
+      fetchSettlements(params.id)
+    }
+  }, [params.id, groups, fetchParticipants, fetchExpenses, fetchSettlements])
+
+  if (!currentGroup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    )
+  }
+
+  const balances = calculateBalances(params.id)
+  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center">
+            <Button variant="ghost" onClick={() => router.push("/")} className="mr-4">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{currentGroup.name}</h1>
+              {currentGroup.description && <p className="text-gray-600">{currentGroup.description}</p>}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowAddExpense(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Expense
+            </Button>
+            <Button variant="outline" onClick={() => setShowSettleUp(true)}>
+              <Calculator className="mr-2 h-4 w-4" />
+              Settle Up
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">৳{totalExpenses.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Participants</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{participants.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Transactions</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{expenses.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="expenses" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            <TabsTrigger value="balances">Balances</TabsTrigger>
+            <TabsTrigger value="settlements">Settlements</TabsTrigger>
+          </TabsList>
+
+          {/* Expenses Tab */}
+          <TabsContent value="expenses" className="space-y-4">
+            {expenses.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Receipt className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-4">No expenses yet</p>
+                  <Button onClick={() => setShowAddExpense(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add First Expense
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              expenses.map((expense) => (
+                <Card key={expense.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{expense.title}</CardTitle>
+                        <CardDescription>
+                          Paid by {expense.payer_name} on {new Date(expense.date).toLocaleDateString()}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="secondary" className="text-lg font-semibold">
+                        ৳{expense.amount.toFixed(2)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Split between:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {expense.splits.map((split) => (
+                          <Badge key={split.id} variant="outline">
+                            {split.participant_name}: ৳{split.amount.toFixed(2)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          {/* Balances Tab */}
+          <TabsContent value="balances" className="space-y-4">
+            {balances.map((balance) => (
+              <Card key={balance.participant_id}>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg">{balance.participant_name}</CardTitle>
+                    <Badge
+                      variant={balance.net_balance >= 0 ? "default" : "destructive"}
+                      className="text-lg font-semibold"
+                    >
+                      {balance.net_balance >= 0 ? "+" : ""}৳{balance.net_balance.toFixed(2)}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Total Paid</p>
+                      <p className="font-semibold">৳{balance.total_paid.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Total Owed</p>
+                      <p className="font-semibold">৳{balance.total_owed.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          {/* Settlements Tab */}
+          <TabsContent value="settlements" className="space-y-4">
+            {settlements.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Calculator className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-4">No settlements yet</p>
+                  <Button onClick={() => setShowSettleUp(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Settlement
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              settlements.map((settlement) => (
+                <Card key={settlement.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">
+                          {settlement.from_name} → {settlement.to_name}
+                        </CardTitle>
+                        <CardDescription>{new Date(settlement.settled_at).toLocaleDateString()}</CardDescription>
+                      </div>
+                      <Badge variant="secondary" className="text-lg font-semibold">
+                        ৳{settlement.amount.toFixed(2)}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  {settlement.note && (
+                    <CardContent>
+                      <p className="text-sm text-gray-600">{settlement.note}</p>
+                    </CardContent>
+                  )}
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Modals */}
+      <AddExpenseModal
+        open={showAddExpense}
+        onOpenChange={setShowAddExpense}
+        groupId={params.id}
+        participants={participants}
+      />
+
+      <SettleUpModal
+        open={showSettleUp}
+        onOpenChange={setShowSettleUp}
+        groupId={params.id}
+        participants={participants}
+        balances={balances}
+      />
+    </div>
+  )
+}
