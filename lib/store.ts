@@ -1,97 +1,106 @@
-import { create } from "zustand"
-import { supabase } from "./supabase"
+import { create } from "zustand";
+import { supabase } from "./supabase";
 
 export type Participant = {
-  id: string
-  group_id: string
-  name: string
-  email?: string
-}
+  id: string;
+  group_id: string;
+  name: string;
+  email?: string;
+};
 
 export type Group = {
-  id: string
-  name: string
-  description?: string
-  created_at: string
-}
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+};
 
 export type Expense = {
-  id: string
-  group_id: string
-  title: string
-  amount: number
-  paid_by: string
-  date: string
-  created_at: string
-  splits: ExpenseSplit[]
-  payer_name?: string
-}
+  id: string;
+  group_id: string;
+  title: string;
+  amount: number;
+  paid_by: string;
+  date: string;
+  created_at: string;
+  splits: ExpenseSplit[];
+  payer_name?: string;
+};
 
 export type ExpenseSplit = {
-  id: string
-  expense_id: string
-  participant_id: string
-  amount: number
-  participant_name?: string
-}
+  id: string;
+  expense_id: string;
+  participant_id: string;
+  amount: number;
+  participant_name?: string;
+};
 
 export type Settlement = {
-  id: string
-  group_id: string
-  from_participant: string
-  to_participant: string
-  amount: number
-  note?: string
-  settled_at: string
-  from_name?: string
-  to_name?: string
-}
+  id: string;
+  group_id: string;
+  from_participant: string;
+  to_participant: string;
+  amount: number;
+  note?: string;
+  settled_at: string;
+  from_name?: string;
+  to_name?: string;
+};
 
 export type Balance = {
-  participant_id: string
-  participant_name: string
-  total_paid: number
-  total_owed: number
-  net_balance: number
-}
+  participant_id: string;
+  participant_name: string;
+  total_paid: number;
+  total_owed: number;
+  net_balance: number;
+};
 
 interface AppState {
-  groups: Group[]
-  participants: Participant[]
-  expenses: Expense[]
-  settlements: Settlement[]
-  currentGroup: Group | null
-  loading: boolean
+  groups: Group[];
+  participants: Participant[];
+  expenses: Expense[];
+  settlements: Settlement[];
+  currentGroup: Group | null;
+  loading: boolean;
 
   // Actions
-  fetchGroups: () => Promise<void>
-  createGroup: (name: string, description?: string) => Promise<Group | null>
-  setCurrentGroup: (group: Group) => void
+  fetchGroups: () => Promise<void>;
+  fetchGroupById: (groupId: string) => Promise<void>;
+  createGroup: (name: string, description?: string) => Promise<Group | null>;
+  setCurrentGroup: (group: Group) => void;
 
-  fetchParticipants: (groupId: string) => Promise<void>
-  addParticipant: (groupId: string, name: string, email?: string) => Promise<void>
+  fetchParticipants: (groupId: string) => Promise<void>;
+  addParticipant: (
+    groupId: string,
+    name: string,
+    email?: string
+  ) => Promise<void>;
 
-  fetchExpenses: (groupId: string) => Promise<void>
+  fetchExpenses: (groupId: string) => Promise<void>;
   addExpense: (expense: {
-    group_id: string
-    title: string
-    amount: number
-    paid_by: string
-    date: string
-    splits: { participant_id: string; amount: number }[]
-  }) => Promise<void>
+    group_id: string;
+    title: string;
+    amount: number;
+    paid_by: string;
+    date: string;
+    splits: { participant_id: string; amount: number }[];
+  }) => Promise<void>;
 
-  fetchSettlements: (groupId: string) => Promise<void>
+  fetchSettlements: (groupId: string) => Promise<void>;
   addSettlement: (settlement: {
-    group_id: string
-    from_participant: string
-    to_participant: string
-    amount: number
-    note?: string
-  }) => Promise<void>
+    group_id: string;
+    from_participant: string;
+    to_participant: string;
+    amount: number;
+    note?: string;
+  }) => Promise<void>;
 
-  calculateBalances: (groupId: string) => Balance[]
-  updateGroup: (groupId: string, name: string, description?: string) => Promise<void>
+  calculateBalances: (groupId: string) => Balance[];
+  updateGroup: (
+    groupId: string,
+    name: string,
+    description?: string
+  ) => Promise<void>;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -103,36 +112,62 @@ export const useStore = create<AppState>((set, get) => ({
   loading: false,
 
   fetchGroups: async () => {
-    set({ loading: true })
+    set({ loading: true });
     try {
-      const { data, error } = await supabase.from("groups").select("*").order("created_at", { ascending: false })
+      const { data, error } = await supabase
+        .from("groups")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error
-      set({ groups: data || [] })
+      if (error) throw error;
+      set({ groups: data || [] });
     } catch (error) {
-      console.error("Error fetching groups:", error)
+      console.error("Error fetching groups:", error);
     } finally {
-      set({ loading: false })
+      set({ loading: false });
+    }
+  },
+  fetchGroupById: async (groupId: string) => {
+    set({ loading: true });
+    try {
+      const { data, error } = await supabase
+        .from("groups")
+        .select("*")
+        .eq("id", groupId)
+        .single();
+
+      console.log("Fetched group:", data);
+
+      if (error) throw error;
+      set({ currentGroup: data });
+    } catch (error) {
+      console.error("Error fetching group by ID:", error);
+    } finally {
+      set({ loading: false });
     }
   },
 
   createGroup: async (name: string, description?: string) => {
     try {
-      const { data, error } = await supabase.from("groups").insert({ name, description }).select().single()
+      const { data, error } = await supabase
+        .from("groups")
+        .insert({ name, description })
+        .select()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      const { groups } = get()
-      set({ groups: [data, ...groups] })
-      return data
+      const { groups } = get();
+      set({ groups: [data, ...groups] });
+      return data;
     } catch (error) {
-      console.error("Error creating group:", error)
-      return null
+      console.error("Error creating group:", error);
+      return null;
     }
   },
 
   setCurrentGroup: (group: Group) => {
-    set({ currentGroup: group })
+    set({ currentGroup: group });
   },
 
   fetchParticipants: async (groupId: string) => {
@@ -141,12 +176,12 @@ export const useStore = create<AppState>((set, get) => ({
         .from("participants")
         .select("*")
         .eq("group_id", groupId)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: true });
 
-      if (error) throw error
-      set({ participants: data || [] })
+      if (error) throw error;
+      set({ participants: data || [] });
     } catch (error) {
-      console.error("Error fetching participants:", error)
+      console.error("Error fetching participants:", error);
     }
   },
 
@@ -156,14 +191,14 @@ export const useStore = create<AppState>((set, get) => ({
         .from("participants")
         .insert({ group_id: groupId, name, email })
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
-      const { participants } = get()
-      set({ participants: [...participants, data] })
+      const { participants } = get();
+      set({ participants: [...participants, data] });
     } catch (error) {
-      console.error("Error adding participant:", error)
+      console.error("Error adding participant:", error);
     }
   },
 
@@ -171,24 +206,28 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data: expensesData, error: expensesError } = await supabase
         .from("expenses")
-        .select(`
+        .select(
+          `
           *,
           participants!expenses_paid_by_fkey(name)
-        `)
+        `
+        )
         .eq("group_id", groupId)
-        .order("date", { ascending: false })
+        .order("date", { ascending: false });
 
-      if (expensesError) throw expensesError
+      if (expensesError) throw expensesError;
 
       const { data: splitsData, error: splitsError } = await supabase
         .from("expense_splits")
-        .select(`
+        .select(
+          `
           *,
           participants(name)
-        `)
-        .in("expense_id", expensesData?.map((e) => e.id) || [])
+        `
+        )
+        .in("expense_id", expensesData?.map((e) => e.id) || []);
 
-      if (splitsError) throw splitsError
+      if (splitsError) throw splitsError;
 
       const expenses =
         expensesData?.map((expense) => ({
@@ -201,11 +240,11 @@ export const useStore = create<AppState>((set, get) => ({
                 ...split,
                 participant_name: split.participants?.name,
               })) || [],
-        })) || []
+        })) || [];
 
-      set({ expenses })
+      set({ expenses });
     } catch (error) {
-      console.error("Error fetching expenses:", error)
+      console.error("Error fetching expenses:", error);
     }
   },
 
@@ -221,24 +260,26 @@ export const useStore = create<AppState>((set, get) => ({
           date: expense.date,
         })
         .select()
-        .single()
+        .single();
 
-      if (expenseError) throw expenseError
+      if (expenseError) throw expenseError;
 
-      const { error: splitsError } = await supabase.from("expense_splits").insert(
-        expense.splits.map((split) => ({
-          expense_id: expenseData.id,
-          participant_id: split.participant_id,
-          amount: split.amount,
-        })),
-      )
+      const { error: splitsError } = await supabase
+        .from("expense_splits")
+        .insert(
+          expense.splits.map((split) => ({
+            expense_id: expenseData.id,
+            participant_id: split.participant_id,
+            amount: split.amount,
+          }))
+        );
 
-      if (splitsError) throw splitsError
+      if (splitsError) throw splitsError;
 
       // Refresh expenses
-      await get().fetchExpenses(expense.group_id)
+      await get().fetchExpenses(expense.group_id);
     } catch (error) {
-      console.error("Error adding expense:", error)
+      console.error("Error adding expense:", error);
     }
   },
 
@@ -246,70 +287,75 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from("settlements")
-        .select(`
+        .select(
+          `
           *,
           from_participant:participants!settlements_from_participant_fkey(name),
           to_participant:participants!settlements_to_participant_fkey(name)
-        `)
+        `
+        )
         .eq("group_id", groupId)
-        .order("settled_at", { ascending: false })
+        .order("settled_at", { ascending: false });
 
-      if (error) throw error
+      if (error) throw error;
 
       const settlements =
         data?.map((settlement) => ({
           ...settlement,
           from_name: settlement.from_participant?.name,
           to_name: settlement.to_participant?.name,
-        })) || []
+        })) || [];
 
-      set({ settlements })
+      set({ settlements });
     } catch (error) {
-      console.error("Error fetching settlements:", error)
+      console.error("Error fetching settlements:", error);
     }
   },
 
   addSettlement: async (settlement) => {
     try {
-      const { error } = await supabase.from("settlements").insert(settlement)
+      const { error } = await supabase.from("settlements").insert(settlement);
 
-      if (error) throw error
+      if (error) throw error;
 
       // Refresh settlements
-      await get().fetchSettlements(settlement.group_id)
+      await get().fetchSettlements(settlement.group_id);
     } catch (error) {
-      console.error("Error adding settlement:", error)
+      console.error("Error adding settlement:", error);
     }
   },
 
   calculateBalances: (groupId: string) => {
-    const { participants, expenses, settlements } = get()
-    const groupParticipants = participants.filter((p) => p.group_id === groupId)
-    const groupExpenses = expenses.filter((e) => e.group_id === groupId)
-    const groupSettlements = settlements.filter((s) => s.group_id === groupId)
+    const { participants, expenses, settlements } = get();
+    const groupParticipants = participants.filter(
+      (p) => p.group_id === groupId
+    );
+    const groupExpenses = expenses.filter((e) => e.group_id === groupId);
+    const groupSettlements = settlements.filter((s) => s.group_id === groupId);
 
     const balances: Balance[] = groupParticipants.map((participant) => {
       // Calculate total paid
       const totalPaid = groupExpenses
         .filter((expense) => expense.paid_by === participant.id)
-        .reduce((sum, expense) => sum + expense.amount, 0)
+        .reduce((sum, expense) => sum + expense.amount, 0);
 
       // Calculate total owed (from expense splits)
       const totalOwed = groupExpenses
         .flatMap((expense) => expense.splits)
         .filter((split) => split.participant_id === participant.id)
-        .reduce((sum, split) => sum + split.amount, 0)
+        .reduce((sum, split) => sum + split.amount, 0);
 
       // Calculate settlements (money received - money paid in settlements)
       const settlementsReceived = groupSettlements
         .filter((settlement) => settlement.to_participant === participant.id)
-        .reduce((sum, settlement) => sum + settlement.amount, 0)
+        .reduce((sum, settlement) => sum + settlement.amount, 0);
 
       const settlementsPaid = groupSettlements
         .filter((settlement) => settlement.from_participant === participant.id)
-        .reduce((sum, settlement) => sum + settlement.amount, 0)
+        .reduce((sum, settlement) => sum + settlement.amount, 0);
 
-      const netBalance = totalPaid - totalOwed + settlementsReceived - settlementsPaid
+      const netBalance =
+        totalPaid - totalOwed + settlementsReceived - settlementsPaid;
 
       return {
         participant_id: participant.id,
@@ -317,10 +363,10 @@ export const useStore = create<AppState>((set, get) => ({
         total_paid: totalPaid,
         total_owed: totalOwed,
         net_balance: netBalance,
-      }
-    })
+      };
+    });
 
-    return balances
+    return balances;
   },
   updateGroup: async (groupId: string, name: string, description?: string) => {
     try {
@@ -329,21 +375,23 @@ export const useStore = create<AppState>((set, get) => ({
         .update({ name, description, updated_at: new Date().toISOString() })
         .eq("id", groupId)
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) throw error;
 
       // Update the groups array
-      const { groups, currentGroup } = get()
-      const updatedGroups = groups.map((group) => (group.id === groupId ? data : group))
-      set({ groups: updatedGroups })
+      const { groups, currentGroup } = get();
+      const updatedGroups = groups.map((group) =>
+        group.id === groupId ? data : group
+      );
+      set({ groups: updatedGroups });
 
       // Update current group if it's the one being edited
       if (currentGroup?.id === groupId) {
-        set({ currentGroup: data })
+        set({ currentGroup: data });
       }
     } catch (error) {
-      console.error("Error updating group:", error)
+      console.error("Error updating group:", error);
     }
   },
-}))
+}));
