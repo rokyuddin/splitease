@@ -2,64 +2,49 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useStore } from "@/lib/store"
 import { Download, FileText, Table } from "lucide-react"
 import jsPDF from "jspdf"
 import "jspdf-autotable"
 
 interface ExportModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
   groupId: string
 }
 
-export function ExportModal({ open, onOpenChange, groupId }: ExportModalProps) {
-  const { currentGroup, expenses, participants, calculateBalances } = useStore()
+export function ExportModal({ groupId }: ExportModalProps) {
+  const [open, setOpen] = useState(false)
   const [exportType, setExportType] = useState<"pdf" | "csv">("pdf")
-  const [exportData, setExportData] = useState<"expenses" | "balances" | "all">("all")
+  const [dataType, setDataType] = useState<"all" | "expenses" | "balances">("all")
   const [loading, setLoading] = useState(false)
 
-  const handleExport = async () => {
+  const { currentGroup, expenses, participants, settlements, calculateBalances } = useStore()
+
+  const exportToPDF = () => {
     if (!currentGroup) return
 
-    setLoading(true)
-    try {
-      if (exportType === "pdf") {
-        await exportToPDF()
-      } else {
-        exportToCSV()
-      }
-      onOpenChange(false)
-    } catch (error) {
-      console.error("Export error:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const exportToPDF = async () => {
     const doc = new jsPDF()
     const balances = calculateBalances(groupId)
 
-    // Title
+    // Header
     doc.setFontSize(20)
-    doc.text(`${currentGroup!.name} - Expense Report`, 20, 20)
-
-    if (currentGroup!.description) {
-      doc.setFontSize(12)
-      doc.text(currentGroup!.description, 20, 30)
-    }
-
-    doc.setFontSize(10)
-    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 40)
+    doc.text(`${currentGroup.name} - Expense Report`, 20, 20)
+    doc.setFontSize(12)
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30)
 
     let yPosition = 50
 
-    // Export expenses
-    if (exportData === "expenses" || exportData === "all") {
+    if (dataType === "all" || dataType === "expenses") {
+      // Expenses Table
       doc.setFontSize(16)
       doc.text("Expenses", 20, yPosition)
       yPosition += 10
@@ -67,23 +52,21 @@ export function ExportModal({ open, onOpenChange, groupId }: ExportModalProps) {
       const expenseData = expenses.map((expense) => [
         expense.title,
         `৳${expense.amount.toFixed(2)}`,
-        expense.payer_name,
+        expense.payer_name || "Unknown",
         new Date(expense.date).toLocaleDateString(),
-        expense.splits.map((s) => `${s.participant_name}: ৳${s.amount.toFixed(2)}`).join(", "),
       ])
       ;(doc as any).autoTable({
-        head: [["Title", "Amount", "Paid By", "Date", "Split"]],
+        head: [["Description", "Amount", "Paid By", "Date"]],
         body: expenseData,
         startY: yPosition,
-        styles: { fontSize: 8 },
-        columnStyles: { 4: { cellWidth: 60 } },
+        theme: "grid",
       })
 
       yPosition = (doc as any).lastAutoTable.finalY + 20
     }
 
-    // Export balances
-    if (exportData === "balances" || exportData === "all") {
+    if (dataType === "all" || dataType === "balances") {
+      // Balances Table
       doc.setFontSize(16)
       doc.text("Balances", 20, yPosition)
       yPosition += 10
@@ -93,128 +76,130 @@ export function ExportModal({ open, onOpenChange, groupId }: ExportModalProps) {
         `৳${balance.total_paid.toFixed(2)}`,
         `৳${balance.total_owed.toFixed(2)}`,
         `৳${balance.net_balance.toFixed(2)}`,
-        balance.net_balance >= 0 ? "Owed" : "Owes",
+        balance.net_balance > 0 ? "Gets back" : balance.net_balance < 0 ? "Owes" : "Settled",
       ])
       ;(doc as any).autoTable({
-        head: [["Participant", "Total Paid", "Total Owed", "Net Balance", "Status"]],
+        head: [["Name", "Total Paid", "Total Owed", "Net Balance", "Status"]],
         body: balanceData,
         startY: yPosition,
-        styles: { fontSize: 8 },
+        theme: "grid",
       })
     }
 
-    doc.save(`${currentGroup!.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_report.pdf`)
+    doc.save(`${currentGroup.name.replace(/\s+/g, "_")}_report.pdf`)
   }
 
   const exportToCSV = () => {
+    if (!currentGroup) return
+
     let csvContent = ""
     const balances = calculateBalances(groupId)
 
-    // Header
-    csvContent += `Group: ${currentGroup!.name}\n`
-    if (currentGroup!.description) {
-      csvContent += `Description: ${currentGroup!.description}\n`
-    }
-    csvContent += `Generated: ${new Date().toLocaleDateString()}\n\n`
-
-    // Export expenses
-    if (exportData === "expenses" || exportData === "all") {
+    if (dataType === "all" || dataType === "expenses") {
       csvContent += "EXPENSES\n"
-      csvContent += "Title,Amount,Paid By,Date,Splits\n"
-
+      csvContent += "Description,Amount,Paid By,Date\n"
       expenses.forEach((expense) => {
-        const splits = expense.splits.map((s) => `${s.participant_name}: ৳${s.amount.toFixed(2)}`).join("; ")
-        csvContent += `"${expense.title}",${expense.amount},"${expense.payer_name}","${expense.date}","${splits}"\n`
+        csvContent += `"${expense.title}",${expense.amount},"${expense.payer_name || "Unknown"}","${new Date(
+          expense.date,
+        ).toLocaleDateString()}"\n`
       })
-
       csvContent += "\n"
     }
 
-    // Export balances
-    if (exportData === "balances" || exportData === "all") {
+    if (dataType === "all" || dataType === "balances") {
       csvContent += "BALANCES\n"
-      csvContent += "Participant,Total Paid,Total Owed,Net Balance,Status\n"
-
+      csvContent += "Name,Total Paid,Total Owed,Net Balance,Status\n"
       balances.forEach((balance) => {
-        const status = balance.net_balance >= 0 ? "Owed" : "Owes"
+        const status = balance.net_balance > 0 ? "Gets back" : balance.net_balance < 0 ? "Owes" : "Settled"
         csvContent += `"${balance.participant_name}",${balance.total_paid},${balance.total_owed},${balance.net_balance},"${status}"\n`
       })
     }
 
-    // Download CSV
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `${currentGroup!.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_report.csv`)
+    link.setAttribute("download", `${currentGroup.name.replace(/\s+/g, "_")}_report.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  const handleExport = async () => {
+    setLoading(true)
+    try {
+      if (exportType === "pdf") {
+        exportToPDF()
+      } else {
+        exportToCSV()
+      }
+      setOpen(false)
+    } catch (error) {
+      console.error("Export error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Export Data</DialogTitle>
-          <DialogDescription>Export your group's expenses and balances</DialogDescription>
+          <DialogTitle>Export Group Data</DialogTitle>
+          <DialogDescription>Choose the format and data to export</DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <Label htmlFor="exportType">Export Format</Label>
-            <Select value={exportType} onValueChange={(value: "pdf" | "csv") => setExportType(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pdf">
-                  <div className="flex items-center">
-                    <FileText className="mr-2 h-4 w-4" />
-                    PDF Report
-                  </div>
-                </SelectItem>
-                <SelectItem value="csv">
-                  <div className="flex items-center">
-                    <Table className="mr-2 h-4 w-4" />
-                    CSV Spreadsheet
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <Label className="text-base font-medium">Export Format</Label>
+            <RadioGroup value={exportType} onValueChange={(value: "pdf" | "csv") => setExportType(value)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pdf" id="pdf" />
+                <Label htmlFor="pdf" className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  PDF Report
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="csv" id="csv" />
+                <Label htmlFor="csv" className="flex items-center">
+                  <Table className="h-4 w-4 mr-2" />
+                  CSV Spreadsheet
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
 
           <div>
-            <Label htmlFor="exportData">Data to Export</Label>
-            <Select value={exportData} onValueChange={(value: "expenses" | "balances" | "all") => setExportData(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select data" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Data</SelectItem>
-                <SelectItem value="expenses">Expenses Only</SelectItem>
-                <SelectItem value="balances">Balances Only</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label className="text-base font-medium">Data to Export</Label>
+            <RadioGroup value={dataType} onValueChange={(value: "all" | "expenses" | "balances") => setDataType(value)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="all" id="all" />
+                <Label htmlFor="all">All Data (Expenses + Balances)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="expenses" id="expenses" />
+                <Label htmlFor="expenses">Expenses Only</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="balances" id="balances" />
+                <Label htmlFor="balances">Balances Only</Label>
+              </div>
+            </RadioGroup>
           </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleExport} disabled={loading} className="flex-1">
-              {loading ? (
-                <>
-                  <Download className="mr-2 h-4 w-4 animate-pulse" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Export
-                </>
-              )}
+            <Button onClick={handleExport} disabled={loading}>
+              {loading ? "Exporting..." : "Export"}
             </Button>
           </div>
         </div>

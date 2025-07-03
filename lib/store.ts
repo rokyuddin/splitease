@@ -201,6 +201,7 @@ export const useStore = create<StoreState>((set, get) => ({
           redirectTo: `${window.location.origin}`,
         },
       })
+
       if (error) throw error
     } catch (error) {
       console.error("Sign in error:", error)
@@ -211,6 +212,7 @@ export const useStore = create<StoreState>((set, get) => ({
   signOut: async () => {
     try {
       const { error } = await supabase.auth.signOut()
+
       if (error) throw error
       set({
         user: null,
