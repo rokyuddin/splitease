@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useStore } from "@/lib/store";
+import { Expense, useStore } from "@/lib/store";
 import {
   ArrowLeft,
   Plus,
@@ -21,11 +21,22 @@ import {
   Calculator,
   DollarSign,
   Edit,
+  EllipsisVertical,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import { AddExpenseModal } from "@/components/add-expense-modal";
 import { SettleUpModal } from "@/components/settle-up-modal";
 import { AddParticipantModal } from "@/components/add-participant-modal";
 import { EditGroupModal } from "@/components/edit-group-modal";
+import { EditExpenseModal } from "@/components/edit-expense-modal";
+import { DeleteExpenseDialog } from "@/components/delete-expense-modal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function GroupDashboard({
   params,
@@ -50,6 +61,8 @@ export default function GroupDashboard({
   const [showSettleUp, setShowSettleUp] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [showEditGroup, setShowEditGroup] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
 
   useEffect(() => {
     fetchGroupById(groupId);
@@ -82,6 +95,16 @@ export default function GroupDashboard({
     (sum, expense) => sum + expense.amount,
     0
   );
+
+  const handleEditExpense = (expense: Expense) => {
+    console.log("Edit expense clicked:", expense.title);
+    setEditingExpense(expense);
+  };
+
+  const handleDeleteExpense = (expense: Expense) => {
+    console.log("Delete expense clicked:", expense.title);
+    setDeletingExpense(expense);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -210,12 +233,45 @@ export default function GroupDashboard({
                           {new Date(expense.date).toLocaleDateString()}
                         </CardDescription>
                       </div>
-                      <Badge
-                        variant="secondary"
-                        className="text-lg font-semibold"
-                      >
-                        ৳{expense.amount.toFixed(2)}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="text-lg font-semibold"
+                        >
+                          ৳{expense.amount.toFixed(2)}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-gray-100"
+                              onClick={() =>
+                                console.log("Dropdown trigger clicked")
+                              }
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              onClick={() => handleEditExpense(expense)}
+                              className="cursor-pointer"
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit Expense
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteExpense(expense)}
+                              className="text-destructive focus:text-destructive cursor-pointer"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete Expense
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -427,6 +483,23 @@ export default function GroupDashboard({
         onOpenChange={setShowEditGroup}
         group={currentGroup}
       />
+
+      {editingExpense && (
+        <EditExpenseModal
+          open={!!editingExpense}
+          onOpenChange={(open) => !open && setEditingExpense(null)}
+          expense={editingExpense}
+          participants={participants}
+        />
+      )}
+
+      {deletingExpense && (
+        <DeleteExpenseDialog
+          open={!!deletingExpense}
+          onOpenChange={(open) => !open && setDeletingExpense(null)}
+          expense={deletingExpense}
+        />
+      )}
     </div>
   );
 }

@@ -85,6 +85,17 @@ interface AppState {
     date: string;
     splits: { participant_id: string; amount: number }[];
   }) => Promise<void>;
+  updateExpense: (
+    expenseId: string,
+    updates: {
+      title: string;
+      amount: number;
+      paid_by: string;
+      date: string;
+      splits: { participant_id: string; amount: number }[];
+    }
+  ) => Promise<void>;
+  deleteExpense: (expenseId: string, groupId: string) => Promise<void>;
 
   fetchSettlements: (groupId: string) => Promise<void>;
   addSettlement: (settlement: {
@@ -135,9 +146,6 @@ export const useStore = create<AppState>((set, get) => ({
         .select("*")
         .eq("id", groupId)
         .single();
-
-      console.log("Fetched group:", data);
-
       if (error) throw error;
       set({ currentGroup: data });
     } catch (error) {
@@ -280,6 +288,79 @@ export const useStore = create<AppState>((set, get) => ({
       await get().fetchExpenses(expense.group_id);
     } catch (error) {
       console.error("Error adding expense:", error);
+    }
+  },
+
+  updateExpense: async (expenseId, updates) => {
+    try {
+      // Update expense
+      const { error: expenseError } = await supabase
+        .from("expenses")
+        .update({
+          title: updates.title,
+          amount: updates.amount,
+          paid_by: updates.paid_by,
+          date: updates.date,
+        })
+        .eq("id", expenseId);
+
+      if (expenseError) throw expenseError;
+
+      // Delete existing splits
+      const { error: deleteSplitsError } = await supabase
+        .from("expense_splits")
+        .delete()
+        .eq("expense_id", expenseId);
+
+      if (deleteSplitsError) throw deleteSplitsError;
+
+      // Insert new splits
+      const { error: splitsError } = await supabase
+        .from("expense_splits")
+        .insert(
+          updates.splits.map((split) => ({
+            expense_id: expenseId,
+            participant_id: split.participant_id,
+            amount: split.amount,
+          }))
+        );
+
+      if (splitsError) throw splitsError;
+
+      // Get the group_id to refresh expenses
+      const expense = get().expenses.find((e) => e.id === expenseId);
+      if (expense) {
+        await get().fetchExpenses(expense.group_id);
+      }
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      throw error;
+    }
+  },
+
+  deleteExpense: async (expenseId, groupId) => {
+    try {
+      // Delete splits first (due to foreign key constraint)
+      const { error: deleteSplitsError } = await supabase
+        .from("expense_splits")
+        .delete()
+        .eq("expense_id", expenseId);
+
+      if (deleteSplitsError) throw deleteSplitsError;
+
+      // Delete expense
+      const { error: deleteExpenseError } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("id", expenseId);
+
+      if (deleteExpenseError) throw deleteExpenseError;
+
+      // Refresh expenses
+      await get().fetchExpenses(groupId);
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      throw error;
     }
   },
 
