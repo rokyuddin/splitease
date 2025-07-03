@@ -1,19 +1,24 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type React from "react"
+import type { Metadata } from "next"
+import "./globals.css"
+import { AuthProvider } from "@/components/auth/auth-provider"
 
 export const metadata: Metadata = {
-  title: "SplitEase",
-  description: "A simple, easy-to-use expense splitting app",
-};
+  title: "SplitEase - Track Shared Expenses",
+  description: "Track shared expenses with friends and family",
+  generator: "v0.dev",
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
-  );
+  )
 }
