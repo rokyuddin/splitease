@@ -24,20 +24,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useStore, type Participant, type Expense } from "@/lib/store";
 
 interface EditExpenseModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  expense: Expense;
+  expense: Expense | null;
   participants: Participant[];
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
 export function EditExpenseModal({
-  open,
-  onOpenChange,
   expense,
   participants,
+  open,
+  setOpen,
 }: EditExpenseModalProps) {
-  const { updateExpense } = useStore();
+  if (!expense) {
+    return null;
+  }
 
+  const { updateExpense } = useStore();
   const [title, setTitle] = useState(expense.title);
   const [amount, setAmount] = useState(expense.amount.toString());
   const [paidBy, setPaidBy] = useState(expense.paid_by);
@@ -92,7 +95,7 @@ export function EditExpenseModal({
         })),
       });
 
-      onOpenChange(false);
+      setOpen(false);
     } catch (error) {
       console.error("Error updating expense:", error);
     } finally {
@@ -101,7 +104,7 @@ export function EditExpenseModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Expense</DialogTitle>
@@ -199,7 +202,7 @@ export function EditExpenseModal({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => setOpen(false)}
               className="flex-1"
             >
               Cancel

@@ -2,10 +2,25 @@ import { Expense, Participant, Settlement } from "./store";
 import { supabase } from "./supabase";
 
 async function fetchGroups() {
-  return await supabase
-    .from("groups")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("groups")
+      .select(
+        `
+        *,
+        group_members!inner(user_id)
+      `
+      )
+      .order("created_at", { ascending: false });
+
+    console.log("Group data:", data);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching groups:", error);
+    return [];
+  }
 }
 
 async function fetchGroupById(groupId: string) {
